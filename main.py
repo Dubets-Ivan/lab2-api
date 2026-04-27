@@ -41,15 +41,16 @@ class VoteRequest(BaseModel):
 question_db: dict[UUID, Question] = {}
 answer_db: dict[UUID, Answer] = {}
 
-def seed_data():
-    q_id = uuid4()
-    a_id_1 = uuid4()
-    a_id_2 = uuid4()
-    user_1 = uuid4()
-    user_2 = uuid4()
+from uuid import uuid4
+from datetime import datetime
 
-    question_db[q_id] = Question(
-        id=q_id,
+def seed_data():
+    q_id_1, q_id_2, q_id_3, q_id_4 = uuid4(), uuid4(), uuid4(), uuid4()
+    a_id_1, a_id_2, a_id_3, a_id_4, a_id_5 = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
+    user_1, user_2 = uuid4(), uuid4()
+
+    question_db[q_id_1] = Question(
+        id=q_id_1,
         author_id=user_1,
         title="Як працює FastAPI?",
         body="Мені цікаво, як FastAPI обробляє запити та відповіді.",
@@ -58,18 +59,69 @@ def seed_data():
     )
     answer_db[a_id_1] = Answer(
         id=a_id_1,
-        question_id=q_id,
+        question_id=q_id_1,
         author_id=user_2,
-        body="FastAPI використовує Starlette для обробки запитів та Pydantic для валідації даних.",
+        body="FastAPI використовує Starlette для веб-частини та Pydantic для валідації даних.",
         votes=3,
         created_at=datetime.now()
     )
     answer_db[a_id_2] = Answer(
         id=a_id_2,
-        question_id=q_id,
+        question_id=q_id_1,
         author_id=user_1,
-        body="Також FastAPI підтримує асинхронні функції, що дозволяє обробляти багато запитів одночасно.",
+        body="Також FastAPI підтримує асинхронні функції (async/await), що підвищує продуктивність.",
         votes=2,
+        created_at=datetime.now()
+    )
+
+    question_db[q_id_2] = Question(
+        id=q_id_2,
+        author_id=user_2,
+        title="Що таке судовий прецедент?",
+        body="Часто чую про судові прецеденти, але не зовсім розумію, що це таке і як вони працюють у правовій системі.",
+        votes=10,
+        created_at=datetime.now()
+    )
+    answer_db[a_id_3] = Answer(
+        id=a_id_3,
+        question_id=q_id_2,
+        author_id=user_1,
+        body="Судовий прецедент — рішення суду, яке є обов’язковим для інших справ.",
+        votes=8,
+        created_at=datetime.now()
+    )
+
+    question_db[q_id_3] = Question(
+        id=q_id_3,
+        author_id=user_1,
+        title="Що таке судова практика?",
+        body="Поясніть, будь ласка, що таке судова практика і як вона впливає на правову систему.",
+        votes=4,
+        created_at=datetime.now()
+    )
+    answer_db[a_id_4] = Answer(
+        id=a_id_4,
+        question_id=q_id_3,
+        author_id=user_2,
+        body="Судова практика — сукупність рішень судів, що формують підходи до застосування норм.",
+        votes=6,
+        created_at=datetime.now()
+    )
+
+    question_db[q_id_4] = Question(
+        id=q_id_4,
+        author_id=user_2,
+        title="Що таке правовий звичай?",
+        body="Мені цікаво, що таке правовий звичай і як він відрізняється від інших джерел права.",
+        votes=3,
+        created_at=datetime.now()
+    )
+    answer_db[a_id_5] = Answer(
+        id=a_id_5,
+        question_id=q_id_4,
+        author_id=user_1,
+        body="Правовий звичай — історично сформоване правило поведінки, яке визнається державою як джерело права.",
+        votes=5,
         created_at=datetime.now()
     )
 
@@ -156,3 +208,11 @@ def update_answer(answer_id: UUID, data: AnswerCreate):
     updated = existing.model_copy(update={"body": data.body})
     answer_db[answer_id] = updated
     return updated
+
+@app.get("/users/{user_id}/answers", response_model=list[Answer], tags=["Users"])
+def get_user_answers(user_id: UUID):
+    return [a for a in answer_db.values() if a.author_id == user_id]
+
+@app.get("/health", tags=["System"])
+def health_check():
+    return {"status": "ok", "service": "Q&A API"}
