@@ -1,13 +1,19 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 from datetime import datetime
+from sqlalchemy.orm import Session
+
+from database import get_db, engine
+import models
+
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Q&A API",
-    description="REST API для системи запитань та відповідей",
-    version="1.0.0"
+    description="REST API з PostgreSQL persistence шаром",
+    version="2.0.0"
 )
 
 class QuestionCreate(BaseModel):
@@ -15,204 +21,218 @@ class QuestionCreate(BaseModel):
     title: str
     body: str
 
-class Question(BaseModel):
+class QuestionOut(BaseModel):
     id: UUID
     author_id: UUID
     title: str
     body: str
-    votes: int = 0
+    votes: int
     created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 class AnswerCreate(BaseModel):
     author_id: UUID
     body: str
 
-class Answer(BaseModel):
+class AnswerOut(BaseModel):
     id: UUID
     question_id: UUID
     author_id: UUID
     body: str
-    votes: int = 0
+    votes: int
     created_at: datetime
 
+    class Config:
+        from_attributes = True
+
 class VoteRequest(BaseModel):
-    vote: int
+    value: int
 
-question_db: dict[UUID, Question] = {}
-answer_db: dict[UUID, Answer] = {}
 
-from uuid import uuid4
-from datetime import datetime
+def seed_data(db: Session):
+    if db.query(models.Question).first():
+        return
 
-def seed_data():
-    q_id_1, q_id_2, q_id_3, q_id_4 = uuid4(), uuid4(), uuid4(), uuid4()
-    a_id_1, a_id_2, a_id_3, a_id_4, a_id_5 = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
     user_1, user_2 = uuid4(), uuid4()
 
-    question_db[q_id_1] = Question(
-        id=q_id_1,
+    q1 = models.Question(
         author_id=user_1,
         title="Як працює FastAPI?",
         body="Мені цікаво, як FastAPI обробляє запити та відповіді.",
-        votes=5,
-        created_at=datetime.now()
-    )
-    answer_db[a_id_1] = Answer(
-        id=a_id_1,
-        question_id=q_id_1,
-        author_id=user_2,
-        body="FastAPI використовує Starlette для веб-частини та Pydantic для валідації даних.",
-        votes=3,
-        created_at=datetime.now()
-    )
-    answer_db[a_id_2] = Answer(
-        id=a_id_2,
-        question_id=q_id_1,
-        author_id=user_1,
-        body="Також FastAPI підтримує асинхронні функції (async/await), що підвищує продуктивність.",
-        votes=2,
-        created_at=datetime.now()
+        votes=5
     )
 
-    question_db[q_id_2] = Question(
-        id=q_id_2,
+    q2 = models.Question(
         author_id=user_2,
         title="Що таке судовий прецедент?",
-        body="Часто чую про судові прецеденти, але не зовсім розумію, що це таке і як вони працюють у правовій системі.",
-        votes=10,
-        created_at=datetime.now()
-    )
-    answer_db[a_id_3] = Answer(
-        id=a_id_3,
-        question_id=q_id_2,
-        author_id=user_1,
-        body="Судовий прецедент — рішення суду, яке є обов’язковим для інших справ.",
-        votes=8,
-        created_at=datetime.now()
+        body="Часто чую про судові прецеденти...",
+        votes=10
     )
 
-    question_db[q_id_3] = Question(
-        id=q_id_3,
+    q3 = models.Question(
         author_id=user_1,
         title="Що таке судова практика?",
-        body="Поясніть, будь ласка, що таке судова практика і як вона впливає на правову систему.",
-        votes=4,
-        created_at=datetime.now()
-    )
-    answer_db[a_id_4] = Answer(
-        id=a_id_4,
-        question_id=q_id_3,
-        author_id=user_2,
-        body="Судова практика — сукупність рішень судів, що формують підходи до застосування норм.",
-        votes=6,
-        created_at=datetime.now()
+        body="Поясніть, будь ласка...",
+        votes=4
     )
 
-    question_db[q_id_4] = Question(
-        id=q_id_4,
+    q4 = models.Question(
         author_id=user_2,
         title="Що таке правовий звичай?",
-        body="Мені цікаво, що таке правовий звичай і як він відрізняється від інших джерел права.",
-        votes=3,
-        created_at=datetime.now()
+        body="Мені цікаво...",
+        votes=3
     )
-    answer_db[a_id_5] = Answer(
-        id=a_id_5,
-        question_id=q_id_4,
+
+    db.add_all([q1, q2, q3, q4])
+    db.commit()
+
+    a1 = models.Answer(
+        question_id=q1.id,
+        author_id=user_2,
+        body="FastAPI використовує Starlette...",
+        votes=3
+    )
+
+    a2 = models.Answer(
+        question_id=q1.id,
         author_id=user_1,
-        body="Правовий звичай — історично сформоване правило поведінки, яке визнається державою як джерело права.",
-        votes=5,
-        created_at=datetime.now()
+        body="Також FastAPI підтримує async/await...",
+        votes=2
     )
 
-seed_data()
+    a3 = models.Answer(
+        question_id=q2.id,
+        author_id=user_1,
+        body="Судовий прецедент — рішення суду...",
+        votes=8
+    )
 
-@app.get("/questions", response_model=list[Question], tags=["Questions"])
-def get_all_questions():
-    return list(question_db.values())
+    a4 = models.Answer(
+        question_id=q3.id,
+        author_id=user_2,
+        body="Судова практика — сукупність рішень...",
+        votes=6
+    )
 
-@app.get("/questions/{question_id}", response_model=Question, tags=["Questions"])
-def get_question(question_id: UUID):
-    if question_id not in question_db:
-        raise HTTPException(status_code=404, detail="Question not found")
-    return question_db[question_id]
+    a5 = models.Answer(
+        question_id=q4.id,
+        author_id=user_1,
+        body="Правовий звичай — історично сформоване правило...",
+        votes=5
+    )
 
-@app.post("/questions", response_model=Question, status_code=201, tags=["Questions"])
-def create_question(data: QuestionCreate):
-    question = Question(
-        id=uuid4(),
+    db.add_all([a1, a2, a3, a4, a5])
+    db.commit()
+
+
+@app.on_event("startup")
+def on_startup():
+    db = next(get_db())
+    seed_data(db)
+
+
+@app.get("/questions", response_model=list[QuestionOut], tags=["Questions"])
+def get_all_questions(db: Session = Depends(get_db)):
+    return db.query(models.Question).all()
+
+
+@app.get("/questions/{question_id}", response_model=QuestionOut, tags=["Questions"])
+def get_question(question_id: UUID, db: Session = Depends(get_db)):
+    q = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Питання не знайдено")
+    return q
+
+
+@app.post("/questions", response_model=QuestionOut, status_code=201, tags=["Questions"])
+def create_question(data: QuestionCreate, db: Session = Depends(get_db)):
+    q = models.Question(
         author_id=data.author_id,
         title=data.title,
-        body=data.body,
-        votes=0,
-        created_at=datetime.now()
+        body=data.body
     )
-    question_db[question.id] = question
-    return question
+    db.add(q)
+    db.commit()
+    db.refresh(q)
+    return q
 
-@app.put("/questions/{question_id}", response_model=Question, tags=["Questions"])
-def update_question(question_id: UUID, data: QuestionCreate):
-    if question_id not in question_db:
-        raise HTTPException(status_code=404, detail="Question not found")
-    existing = question_db[question_id]
-    updated = existing.model_copy(update={
-        "title": data.title,
-        "body": data.body
-    })
-    question_db[question_id] = updated
-    return updated
+
+@app.put("/questions/{question_id}", response_model=QuestionOut, tags=["Questions"])
+def update_question(question_id: UUID, data: QuestionCreate, db: Session = Depends(get_db)):
+    q = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Питання не знайдено")
+    q.title = data.title
+    q.body = data.body
+    db.commit()
+    db.refresh(q)
+    return q
+
 
 @app.delete("/questions/{question_id}", status_code=204, tags=["Questions"])
-def delete_question(question_id: UUID):
-    if question_id not in question_db:
-        raise HTTPException(status_code=404, detail="Question not found")
-    del question_db[question_id]
+def delete_question(question_id: UUID, db: Session = Depends(get_db)):
+    q = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Питання не знайдено")
+    db.delete(q)
+    db.commit()
 
-@app.post("/questions/{question_id}/vote", response_model=Question, tags=["Questions"])
-def vote_question(question_id: UUID, vote: VoteRequest):
-    if question_id not in question_db:
-        raise HTTPException(status_code=404, detail="Question not found")
+
+@app.post("/questions/{question_id}/vote", response_model=QuestionOut, tags=["Questions"])
+def vote_question(question_id: UUID, vote: VoteRequest, db: Session = Depends(get_db)):
     if vote.value not in (1, -1):
         raise HTTPException(status_code=400, detail="value має бути +1 або -1")
-    q = question_db[question_id]
-    updated = q.model_copy(update={"votes": q.votes + vote.value})
-    question_db[question_id] = updated
-    return updated
+    q = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Питання не знайдено")
+    q.votes += vote.value
+    db.commit()
+    db.refresh(q)
+    return q
 
-@app.get("/questions/{question_id}/answers", response_model=list[Answer], tags=["Answers"])
-def get_answers_for_question(question_id: UUID):
-    if question_id not in question_db:
-        raise HTTPException(status_code=404, detail="Question not found")
-    return [a for a in answer_db.values() if a.question_id == question_id]
 
-@app.post("/questions/{question_id}/answers", response_model=Answer, status_code=201, tags=["Answers"])
-def create_answer(question_id: UUID, data: AnswerCreate):
-    if question_id not in question_db:
-        raise HTTPException(status_code=404, detail="Question not found")
-    answer = Answer(
-        id=uuid4(),
+@app.get("/questions/{question_id}/answers", response_model=list[AnswerOut], tags=["Answers"])
+def get_answers(question_id: UUID, db: Session = Depends(get_db)):
+    q = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Питання не знайдено")
+    return db.query(models.Answer).filter(models.Answer.question_id == question_id).all()
+
+
+@app.post("/questions/{question_id}/answers", response_model=AnswerOut, status_code=201, tags=["Answers"])
+def create_answer(question_id: UUID, data: AnswerCreate, db: Session = Depends(get_db)):
+    q = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Питання не знайдено")
+    a = models.Answer(
         question_id=question_id,
         author_id=data.author_id,
-        body=data.body,
-        votes=0,
-        created_at=datetime.utcnow()
+        body=data.body
     )
-    answer_db[answer.id] = answer
-    return answer
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return a
 
-@app.put("/answers/{answer_id}", response_model=Answer, tags=["Answers"])
-def update_answer(answer_id: UUID, data: AnswerCreate):
-    if answer_id not in answer_db:
+
+@app.put("/answers/{answer_id}", response_model=AnswerOut, tags=["Answers"])
+def update_answer(answer_id: UUID, data: AnswerCreate, db: Session = Depends(get_db)):
+    a = db.query(models.Answer).filter(models.Answer.id == answer_id).first()
+    if not a:
         raise HTTPException(status_code=404, detail="Відповідь не знайдена")
-    existing = answer_db[answer_id]
-    updated = existing.model_copy(update={"body": data.body})
-    answer_db[answer_id] = updated
-    return updated
+    a.body = data.body
+    db.commit()
+    db.refresh(a)
+    return a
 
-@app.get("/users/{user_id}/answers", response_model=list[Answer], tags=["Users"])
-def get_user_answers(user_id: UUID):
-    return [a for a in answer_db.values() if a.author_id == user_id]
+
+@app.get("/users/{user_id}/answers", response_model=list[AnswerOut], tags=["Users"])
+def get_user_answers(user_id: UUID, db: Session = Depends(get_db)):
+    return db.query(models.Answer).filter(models.Answer.author_id == user_id).all()
+
 
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok", "service": "Q&A API"}
+    return {"status": "ok", "db": "postgresql", "service": "Q&A API v2"}
