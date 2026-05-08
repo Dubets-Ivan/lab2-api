@@ -48,89 +48,7 @@ class AnswerOut(BaseModel):
         from_attributes = True
 
 class VoteRequest(BaseModel):
-    value: int
-
-
-def seed_data(db: Session):
-    if db.query(models.Question).first():
-        return
-
-    user_1, user_2 = uuid4(), uuid4()
-
-    q1 = models.Question(
-        author_id=user_1,
-        title="Як працює FastAPI?",
-        body="Мені цікаво, як FastAPI обробляє запити та відповіді.",
-        votes=5
-    )
-
-    q2 = models.Question(
-        author_id=user_2,
-        title="Що таке судовий прецедент?",
-        body="Часто чую про судові прецеденти...",
-        votes=10
-    )
-
-    q3 = models.Question(
-        author_id=user_1,
-        title="Що таке судова практика?",
-        body="Поясніть, будь ласка...",
-        votes=4
-    )
-
-    q4 = models.Question(
-        author_id=user_2,
-        title="Що таке правовий звичай?",
-        body="Мені цікаво...",
-        votes=3
-    )
-
-    db.add_all([q1, q2, q3, q4])
-    db.commit()
-
-    a1 = models.Answer(
-        question_id=q1.id,
-        author_id=user_2,
-        body="FastAPI використовує Starlette...",
-        votes=3
-    )
-
-    a2 = models.Answer(
-        question_id=q1.id,
-        author_id=user_1,
-        body="Також FastAPI підтримує async/await...",
-        votes=2
-    )
-
-    a3 = models.Answer(
-        question_id=q2.id,
-        author_id=user_1,
-        body="Судовий прецедент — рішення суду...",
-        votes=8
-    )
-
-    a4 = models.Answer(
-        question_id=q3.id,
-        author_id=user_2,
-        body="Судова практика — сукупність рішень...",
-        votes=6
-    )
-
-    a5 = models.Answer(
-        question_id=q4.id,
-        author_id=user_1,
-        body="Правовий звичай — історично сформоване правило...",
-        votes=5
-    )
-
-    db.add_all([a1, a2, a3, a4, a5])
-    db.commit()
-
-
-@app.on_event("startup")
-def on_startup():
-    db = next(get_db())
-    seed_data(db)
+    value: int 
 
 
 @app.get("/questions", response_model=list[QuestionOut], tags=["Questions"])
@@ -173,6 +91,7 @@ def update_question(question_id: UUID, data: QuestionCreate, db: Session = Depen
 
 @app.delete("/questions/{question_id}", status_code=204, tags=["Questions"])
 def delete_question(question_id: UUID, db: Session = Depends(get_db)):
+    """DELETE FROM questions WHERE id=:id (каскадно видаляє і відповіді)"""
     q = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not q:
         raise HTTPException(status_code=404, detail="Питання не знайдено")
@@ -191,7 +110,6 @@ def vote_question(question_id: UUID, vote: VoteRequest, db: Session = Depends(ge
     db.commit()
     db.refresh(q)
     return q
-
 
 @app.get("/questions/{question_id}/answers", response_model=list[AnswerOut], tags=["Answers"])
 def get_answers(question_id: UUID, db: Session = Depends(get_db)):
@@ -226,7 +144,6 @@ def update_answer(answer_id: UUID, data: AnswerCreate, db: Session = Depends(get
     db.commit()
     db.refresh(a)
     return a
-
 
 @app.get("/users/{user_id}/answers", response_model=list[AnswerOut], tags=["Users"])
 def get_user_answers(user_id: UUID, db: Session = Depends(get_db)):
