@@ -21,7 +21,7 @@ app = FastAPI(
     version="3.0.0"
 )
 
-Instrumentator().instrument(app).expose(app)
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
