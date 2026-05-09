@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Depends, Request
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette_prometheus import metrics, PrometheusMiddleware
 
@@ -26,10 +27,6 @@ app.add_route("/metrics", metrics)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """
-    Middleware виконується для КОЖНОГО запиту.
-    Логує: метод, шлях, статус, час виконання, request_id.
-    """
     request_id = str(uuid_module.uuid4())[:8]  # короткий ID для трасування
     start_time = time.time()
 
@@ -219,7 +216,7 @@ def get_user_answers(user_id: UUID, db: Session = Depends(get_db)):
 @app.get("/health", tags=["System"])
 def health_check(db: Session = Depends(get_db)):
     try:
-        db.execute(models.text("SELECT 1"))
+        db.execute(text("SELECT 1"))
         logger.info("health_check_ok", extra={"db": "connected"})
         return {"status": "ok", "db": "connected"}
     except Exception as e:
