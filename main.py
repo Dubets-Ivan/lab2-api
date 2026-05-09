@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
 from sqlalchemy.orm import Session
-from prometheus_fastapi_instrumentator import Instrumentator
+from starlette_prometheus import metrics, PrometheusMiddleware
 
 from database import get_db, engine
 import models
@@ -21,7 +21,8 @@ app = FastAPI(
     version="3.0.0"
 )
 
-Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+app.add_middleware(PrometheusMiddleware)
+app.add_route("/metrics", metrics)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
