@@ -25,7 +25,7 @@ jobs:
       - name: Health check
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://lab2-api.onrender.com/health)
+            https://lab2-api-oaag.onrender.com/health
           echo "Health check status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "Health check failed!"
