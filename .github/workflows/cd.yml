@@ -4,7 +4,7 @@ on:
   push:
     branches: ["main"]
 
-jobs:
+jobs: 
   deploy:
     name: Deploy to Render.com
     runs-on: ubuntu-latest
